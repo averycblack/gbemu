@@ -1,5 +1,5 @@
 #pragma once
-#include "gb.h"
+#include <gb/gb.h>
 #include "gbspace.h"
 #include <string>
 #include <cmath>

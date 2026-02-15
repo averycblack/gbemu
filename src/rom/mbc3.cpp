@@ -1,4 +1,4 @@
-#include "gbrom.h"
+#include <gb/gbrom.h>
 
 MBC3Rom::MBC3Rom(std::filesystem::path path, UINT8* eram, UINT8* rom, size_t romSize)
 	: Rom(path, eram, rom, romSize)

@@ -10,12 +10,12 @@
 #include <filesystem>
 #include <limits>
 
-#include "gbcpu.h"
-#include "gbinput.h"
-#include "gbgpu.h"
-#include "gbtimer.h"
-#include "SDLWindow.h"
-#include "gb.h"
+#include <gb/gbcpu.h>
+#include <gb/gbinput.h>
+#include <gb/gbgpu.h>
+#include <gb/gbtimer.h>
+#include <gb/SDLWindow.h>
+#include <gb/gb.h>
 
 Rom* readRom() {
 	PWSTR fileName;

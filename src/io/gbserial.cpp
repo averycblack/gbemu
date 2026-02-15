@@ -1,5 +1,5 @@
-#include "gbserial.h"
-#include "gb.h"
+#include <gb/gbserial.h>
+#include <gb/gb.h>
 
 int gbSerial::writeByte(UINT16 addr, UINT8 byte) {
 	switch (addr) {

@@ -1,6 +1,6 @@
-#include "gbgpu.h"
-#include "gbcpu.h"
-#include "gb.h"
+#include <gb/gbgpu.h>
+#include <gb/gbcpu.h>
+#include <gb/gb.h>
 #include <vector>
 #include <algorithm>
 #include <assert.h>

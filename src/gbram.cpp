@@ -1,5 +1,5 @@
-#include "gbram.h"
-#include "gb.h"
+#include <gb/gbram.h>
+#include <gb/gb.h>
 
 int gbRam::readByte(UINT16 addr) {
 	// Echoed RAM

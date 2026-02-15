@@ -1,7 +1,7 @@
 #pragma once
-#include "SDL.h"
-#include "gbgpu.h"
-#include "gb.h"
+#include <SDL.h>
+#include <gb/gbgpu.h>
+#include <gb/gb.h>
 
 class sdlWindow {
 public:

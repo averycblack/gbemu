@@ -1,5 +1,5 @@
-#include "gbinput.h"
-#include "gb.h"
+#include <gb/gbinput.h>
+#include <gb/gb.h>
 
 int gbInput::readByte(UINT16 addr) {
 	if (addr != 0xFF00) return -1;

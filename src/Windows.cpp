@@ -1,4 +1,4 @@
-#include "gb.h"
+#include <gb/gb.h>
 #include <shobjidl.h>
 #include <shlwapi.h>
 #include <shlobj.h>
@@ -12,9 +12,9 @@
 #include <new>
 #include <stdlib.h>
 
-#pragma comment(linker,"\"/manifestdependency:type='win32' \
-name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
-processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+// #pragma comment(linker,"\"/manifestdependency:type='win32' \
+// name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+// processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 const COMDLG_FILTERSPEC c_rgSaveTypes[] = {
     {L"Gameboy (*.gb)", L"*.gb;*.gbc"}
@@ -191,8 +191,5 @@ exit:
 }
 
 void displayPopup(const std::string& text, HWND hWnd) {
-    wchar_t wtext[200];
-    size_t ret;
-    mbstowcs_s(&ret, wtext, text.c_str(), 200);
-    MessageBox(hWnd, wtext, NULL, MB_OK);
+    MessageBox(hWnd, text.c_str(), NULL, MB_OK);
 }

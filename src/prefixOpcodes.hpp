@@ -1,7 +1,7 @@
 #pragma once
 
-#include "gb.h"
-#include "gbcpu.h"
+#include <gb/gb.h>
+#include <gb/gbcpu.h>
 
 void nop(gbCpu* cpu) {}
 

@@ -1,7 +1,14 @@
-#include "gbsound.h"
+#include <gb/gbsound.h>
 #include <BaseTsd.h>
-#include "gb.h"
+#include <gb/gb.h>
 #include <vector>
+
+constexpr UINT8 squareWaveDuty[] {
+	0b00000001,
+	0b10000001,
+	0b10000111,
+	0b01111110
+};
 
 void gbSC1::triggerSound() {
 	enabled = true;
@@ -482,8 +489,10 @@ void gbSound::step() {
 	if (pan & 0x40) right += ret3;
 	if (pan & 0x80) right += ret4;
 
-	leftTotal += double(left * volL * lowPassFilterVals[sample]);
-	rightTotal += double(right * volR * lowPassFilterVals[sample]);
+	leftTotal = double(left * volL);
+	rightTotal = double(right * volR);
+	// leftTotal += double(left * volL * lowPassFilterVals[sample % std::size(lowPassFilterVals) ]);
+	// rightTotal += double(right * volR * lowPassFilterVals[sample % std::size(lowPassFilterVals)]);
 
 	sample++;
 	int max = OUTPUT_SAMPLES;
@@ -494,8 +503,8 @@ void gbSound::step() {
 
 	sample %= max;
 	if (sample == 0) {
-		buf.push_back((float) leftTotal / 200);
-		buf.push_back((float) rightTotal / 200);
+		buf.push_back((float) leftTotal / 200.0);
+		buf.push_back((float) rightTotal / 200.0);
 
 		/*if (remainders-- < 0) {
 			remainders = OUTPUT_SAMPLES_REMAINDER_MAX;

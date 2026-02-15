@@ -1,4 +1,4 @@
-#include "gbrom.h"
+#include <gb/gbrom.h>
 #include <filesystem>
 #include <iostream>
 #include <fstream>

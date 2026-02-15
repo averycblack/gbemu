@@ -79,7 +79,10 @@ public:
 
 #ifdef CGB
 		A = 0x11;
-		B = 0x00;
+		zero = 1;
+		BC = 0x0000;
+		DE = 0x0800;
+		HL = 0x007C;
 #else
 		A = 0x01;
 		zero = 1;

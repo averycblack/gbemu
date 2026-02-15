@@ -1,5 +1,5 @@
-#include "SDLWindow.h"
-#include "gbgpu.h"
+#include <gb/SDLWindow.h>
+#include <gb/gbgpu.h>
 
 void sdlWindow::present() {
 

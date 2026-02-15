@@ -1,7 +1,4 @@
-DEBUG/
-x64/
 **.gb
-.vs/
-**/lib
-**/include
+build/
 **/bootRom.h
+externals

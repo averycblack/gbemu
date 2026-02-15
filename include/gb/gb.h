@@ -2,24 +2,24 @@
 #define NOMINMAX
 #include <windows.h>
 #include <stdio.h>
-#include "gbram.h"
-#include "gbrom.h"
-#include "gbcpu.h"
-#include "gbgpu.h"
-#include "gbinput.h"
-#include "gbtimer.h"
-#include "gbserial.h"
-#include "gbsound.h"
+#include <gb/gbram.h>
+#include <gb/gbrom.h>
+#include <gb/gbcpu.h>
+#include <gb/gbgpu.h>
+#include <gb/gbinput.h>
+#include <gb/gbtimer.h>
+#include <gb/gbserial.h>
+#include <gb/gbsound.h>
 #include <vector>
 #include <string>
 
-#ifdef BIG_ENDIAN
-#error "Big Endian not supported"
-#endif
+// #ifdef BIG_ENDIAN
+// #error "Big Endian not supported"
+// #endif
 
-#if !defined BIG_ENDIAN && !defined LITTLE_ENDIAN
-#error "Endianness not given"
-#endif
+// #if !defined BIG_ENDIAN && !defined LITTLE_ENDIAN
+// #error "Endianness not given"
+// #endif
 
 #define MAX_SIZE 0xFFFF
 
@@ -51,7 +51,6 @@ class Rom;
 class GameboyEmu {
 public:
 	GameboyEmu(Rom* rom) : rom(rom) {
-		//this->rom = rom;
 		cpu = new gbCpu();
 		gpu = new gbGpu();
 		ram = new gbRam();

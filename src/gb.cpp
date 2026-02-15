@@ -1,9 +1,9 @@
-#include "gb.h"
-#include "gbgpu.h"
-#include "gbtimer.h"
+#include <gb/gb.h>
+#include <gb/gbgpu.h>
+#include <gb/gbtimer.h>
 #include <tchar.h>
 #include <Windows.h>
-#include "SDL.h"
+#include <SDL.h>
 
 #ifdef BOOT_ROM
 #include "bootRom.h"

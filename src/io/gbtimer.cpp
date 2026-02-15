@@ -1,7 +1,11 @@
-#include "gbtimer.h"
-#include "gb.h"
+#include <gb/gbtimer.h>
+#include <gb/gb.h>
 
-int gbTimer::writeByte(UINT16 addr, UINT8 val) {
+using namespace gb::timer;
+
+const int freqToBit[4] { 1020, 12, 60, 252 };
+
+int Timer::writeByte(UINT16 addr, UINT8 val) {
 	int overflowVal = (freqToBit[tac & 0x3] / 2) + 1;
 	bool oldEnable = tac & 0x4;
 	bool glitch, newEnable;
@@ -41,7 +45,7 @@ int gbTimer::writeByte(UINT16 addr, UINT8 val) {
 	return 0;
 }
 
-int gbTimer::readByte(UINT16 addr) {
+int Timer::readByte(UINT16 addr) {
 	switch (addr) {
 	case 0xFF04: return div >> 8;
 	case 0xFF05: return tima;
@@ -51,7 +55,7 @@ int gbTimer::readByte(UINT16 addr) {
 	}
 }
 
-void gbTimer::step() {
+void Timer::step() {
 	int overflowMask = freqToBit[tac & 0x3];
 
 	// Detect falling edge to increment tima
