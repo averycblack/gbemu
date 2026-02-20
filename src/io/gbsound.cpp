@@ -3,6 +3,8 @@
 #include <gb/gb.h>
 #include <vector>
 
+using namespace gb::sound;
+
 constexpr UINT8 squareWaveDuty[] {
 	0b00000001,
 	0b10000001,
@@ -12,38 +14,41 @@ constexpr UINT8 squareWaveDuty[] {
 
 void gbSC1::triggerSound() {
 	enabled = true;
-	if (length == 0) 
-		length = 64;
+	if (nr11Len == 0) 
+		nr11Len = 64;
 
 	UINT16 freq = mem[3] | ((mem[4] & 0x7) << 8);
 	timer = SQUARE_FREQUENCY_PERIOD(freq);
-	envelopeTimer = envelopePeriod;
-	volume = startingVolume;
+	envelopeTimer = nr12EnvPeriod;
+	if (nr12EnvPeriod == 0)
+		envelopeTimer = 8;
+	volume = nr12Vol;
 
 	// Sweep specifics
 	frequencyShadow = freq;
-	sweepTimer = sweepPeriod;
-	sweepEnabled = sweepPeriod != 0 || sweepShift != 0;
-	if (sweepShift != 0)
-		shiftFrequency(true);
+	sweepTimer = nr10SwpPace;
+	sweepEnabled = nr10SwpPace != 0 || nr10SwpStep != 0;
+	if (nr10SwpStep != 0) {
+		shiftFreqCheck(false);
+	}
 }
 
-void gbSC1::shiftFrequency(bool write) {
-	int shifted = frequencyShadow >> sweepShift;
-	int newFreq = frequencyShadow + (sweepNegate ? -shifted : shifted);
+void gbSC1::shiftFreqCheck(bool write) {
+	int shifted = frequencyShadow >> nr10SwpStep;
+	int newFreq = frequencyShadow + (nr10SwpDir ? -shifted : shifted);
 	// Check for overflow
 	if (newFreq < 0 || newFreq > 2047) {
 		enabled = false;
-	} else if (write && sweepShift != 0) {
+	} else if (write) {
 		frequencyShadow = newFreq;
-		frequency = newFreq;
+		nr13Freq = newFreq;
 	}
 }
 
 double gbSC1::step(bool lengthClock, bool volumeClock, bool sweepClock){
-	if (lengthClock && enabled && counter) {
-		length--;
-		if (length == 0) {
+	if (lengthClock && enabled && nr14LenEnable) {
+		nr11Len--;
+		if (nr11Len == 0) {
 			enabled = false;
 		}
 	}
@@ -51,39 +56,39 @@ double gbSC1::step(bool lengthClock, bool volumeClock, bool sweepClock){
 	if (volumeClock && envelopeTimer > 0) {
 		envelopeTimer--;
 		// Volume Envelope stops when at min or max
-		if (envelopeTimer == 0 && envelopePeriod != 0) {
-			int tempVol = volume + (envelopeAdd ? 1 : -1);
+		if (envelopeTimer == 0 && nr12EnvPeriod != 0) {
+			int tempVol = volume + (nr12EnvDir ? 1 : -1);
 			if (tempVol >= 0 && tempVol <= 15) {
 				volume = tempVol;
-				envelopeTimer = envelopePeriod;
+				envelopeTimer = nr12EnvPeriod;
+				if (nr12EnvPeriod == 0)
+					envelopeTimer = 8;
 			}
 		}
 	}
 
-	if (sweepClock && sweepPeriod > 0) {
+	if (sweepClock && sweepTimer > 0) {
 		sweepTimer--;
-		if (sweepTimer == 0 && sweepEnabled && sweepPeriod != 0) {
-			sweepTimer = sweepPeriod;
-			shiftFrequency(true);
-			shiftFrequency(false);
+		if (sweepTimer == 0 && sweepEnabled && nr10SwpPace != 0) {
+			sweepTimer = nr10SwpPace;
+			shiftFreqCheck(true);
 		}
 	}
 
-	timer -= 4;
+	timer -= 1;
 	if (timer <= 0) {
 		timer = SQUARE_FREQUENCY_PERIOD(frequencyShadow);
 		cycle++;
 		cycle %= 8;
 	}
-
 	
 	if (!enabled) {
 		return 0.0;
 	}
 
-	UINT8 duty = squareWaveDuty[dutyCycle];
+	UINT8 duty = squareWaveDuty[nr11DutyCycle];
 	double effectiveVolume = volume/*/ MAX_VOLUME*/;
-	return ((duty >> cycle) & 0x1) * effectiveVolume;
+	return double((duty >> cycle) & 0x1) * effectiveVolume / 15.0;
 }
 
 int gbSC1::writeByte(UINT16 addr, UINT8 byte) {
@@ -95,7 +100,7 @@ int gbSC1::writeByte(UINT16 addr, UINT8 byte) {
 	}
 
 	if (addr == 0xFF11) {
-		length = 64 - length;
+		nr11Len = 64 - nr11Len;
 	}
 
 	return 0;
@@ -150,7 +155,7 @@ double gbSC2::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 		}
 	}
 
-	timer -= 4;
+	timer -= 1;
 	if (timer <= 0) {
 		UINT16 freq = mem[3] | ((mem[4] & 0x7) << 8);
 		timer = SQUARE_FREQUENCY_PERIOD(freq);
@@ -165,7 +170,7 @@ double gbSC2::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 
 	UINT8 duty = squareWaveDuty[dutyCycle];
 	double effectiveVolume = volume/*/ MAX_VOLUME*/;
-	return ((duty >> cycle) & 0x1) * effectiveVolume;
+	return ((duty >> cycle) & 0x1) * effectiveVolume / 15.0;
 }
 
 int gbSC2::writeByte(UINT16 addr, UINT8 byte) {
@@ -219,7 +224,7 @@ double gbSC3::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 		}
 	}
 
-	timer -= 4;
+	timer -= 2;
 	if (timer <= 0) {
 		UINT16 freq = mem[3] | ((mem[4] & 0x7) << 8);
 		timer += WAVE_FREQUENCY_PERIOD(freq);
@@ -240,7 +245,7 @@ double gbSC3::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 
 	duty &= 0x0F;
 
-	return (duty >> volumeCodes[volume]);
+	return (duty >> volumeCodes[volume]) / 16.0;
 }
 
 int gbSC3::writeByte(UINT16 addr, UINT8 byte) {
@@ -291,7 +296,7 @@ void gbSC4::triggerSound() {
 	if (length == 0)
 		length = 64;
 
-	timer = NOISE_FREQUENCY_PERIOD(divisorCodes[divisor], clockShift);
+	timer = NOISE_FREQUENCY_PERIOD((divisor + 1) * 2, clockShift);
 	envelopeTimer = envelopePeriod;
 	volume = startingVolume;
 }
@@ -318,7 +323,7 @@ double gbSC4::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 
 	timer -= 4;
 	if (timer <= 0) {
-		timer = NOISE_FREQUENCY_PERIOD(divisorCodes[divisor], clockShift);
+		timer = NOISE_FREQUENCY_PERIOD((divisor + 1) * 2, clockShift);
 		UINT16 xorRes = shiftRegister & 1;
 		shiftRegister >>= 1;
 		xorRes ^= shiftRegister & 1;
@@ -334,7 +339,7 @@ double gbSC4::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 	}
 
 	double effectiveVolume = volume/*/ MAX_VOLUME*/;
-	return (!(shiftRegister & 0x1)) * effectiveVolume;
+	return (!(shiftRegister & 0x1)) * (effectiveVolume / 15.0);
 }
 
 int gbSC4::writeByte(UINT16 addr, UINT8 byte) {
@@ -367,7 +372,7 @@ int gbSC4::readByte(UINT16 addr) {
 
 // ******************* Sound Controller *******************
 
-gbSound::gbSound() {
+APU::APU(gb::timer::Timer &timer) : mTimer(timer), mDivApuClk(8) {
 	SDL_AudioSpec outSpec{ 0 };
 	SDL_AudioSpec gotSpec{ 0 };
 
@@ -386,8 +391,9 @@ gbSound::gbSound() {
 	SDL_PauseAudioDevice(dev, 0);
 }
 
-int gbSound::writeByte(UINT16 addr, UINT8 byte) {
+int APU::writeByte(UINT16 addr, UINT8 byte) {
 	UINT8 on;
+	debugPrint("%x %x\n", addr, byte);
 	if (sc1.writeByte(addr, byte) == 0) return 0;
 	if (sc2.writeByte(addr, byte) == 0) return 0;
 	if (sc3.writeByte(addr, byte) == 0) return 0;
@@ -404,7 +410,7 @@ int gbSound::writeByte(UINT16 addr, UINT8 byte) {
 			memset(sc3.mem, 0, sizeof(sc3.mem));
 			memset(sc4.mem, 0, sizeof(sc4.mem));
 		} else if (!poweredOn) {
-			frameSequencer = 0;
+			mDivApuClk.mAccum = 0;
 			sc1.cycle = 0;
 		}
 
@@ -417,7 +423,7 @@ int gbSound::writeByte(UINT16 addr, UINT8 byte) {
 	return 0;
 }
 
-int gbSound::readByte(UINT16 addr) {
+int APU::readByte(UINT16 addr) {
 	int ret = sc1.readByte(addr);
 	if (ret != -1) return ret;
 
@@ -445,77 +451,55 @@ int gbSound::readByte(UINT16 addr) {
 	return -1;
 }
 
-void gbSound::step() {
-	bool lengthClock = false;
-	bool sweepClock = false;
-	bool envelopeClock = false;
-
-	frameCounter -= 4;
-	if (frameCounter <= 0) {
-		frameCounter = FRAME_SEQUENCE_PERIOD;
-		if ((frameSequencer & 1) == 0) {
-			lengthClock = true;
-		}
-
-		if ((frameSequencer & 3) == 2) {
-			sweepClock = true;
-		}
-
-		if (frameSequencer == 7) {
-			envelopeClock = true;
-		}
-
-		frameSequencer++;
-		frameSequencer %= 8;
+void APU::step() {
+	auto clk = mTimer.getDivClk();
+	// BIT 11 in double speed mode
+	if (mDivApuDet.sample(clk.mAccum & BIT(10))) {
+		(void) mDivApuClk.increment(1);
 	}
 
-	if (!poweredOn) return;
+	uint32_t divApu = mDivApuClk.mAccum;
+	bool lengthClock = mLengthDet.sample(divApu & BIT(0));
+	bool sweepClock = mSweepDet.sample(divApu & BIT(1));
+	bool envelopeClock = mSweepDet.sample(divApu & BIT(2));
 
-	double left = 0;
-	double right = 0;
+	if (!poweredOn) return;
 
 	double ret1 = sc1.step(lengthClock, envelopeClock, sweepClock);
 	double ret2 = sc2.step(lengthClock, envelopeClock, sweepClock);
 	double ret3 = sc3.step(lengthClock, envelopeClock, sweepClock);
 	double ret4 = sc4.step(lengthClock, envelopeClock, sweepClock);
 	
-	if (pan & 0x01) left += ret1;
-	if (pan & 0x02) left += ret2;
-	if (pan & 0x04) left += ret3;
-	if (pan & 0x08) left += ret4;
+	if (pan & 0x01) sampleLeft += ret1;
+	if (pan & 0x02) sampleLeft += ret2;
+	if (pan & 0x04) sampleLeft += ret3;
+	if (pan & 0x08) sampleLeft += ret4;
 
-	if (pan & 0x10) right += ret1;
-	if (pan & 0x20) right += ret2;
-	if (pan & 0x40) right += ret3;
-	if (pan & 0x80) right += ret4;
+	if (pan & 0x10) sampleRight += ret1;
+	if (pan & 0x20) sampleRight += ret2;
+	if (pan & 0x40) sampleRight += ret3;
+	if (pan & 0x80) sampleRight += ret4;
 
-	leftTotal = double(left * volL);
-	rightTotal = double(right * volR);
 	// leftTotal += double(left * volL * lowPassFilterVals[sample % std::size(lowPassFilterVals) ]);
 	// rightTotal += double(right * volR * lowPassFilterVals[sample % std::size(lowPassFilterVals)]);
 
 	sample++;
 	int max = OUTPUT_SAMPLES;
 
-	// The gameboy frequency is not divisible by the output sample rate (48000)
-	// Add an extra sample when needed to keep the sample rate at 48000
-	//max += remainders < OUTPUT_SAMPLES_REMAINDER  ? 1 : 0;
-
 	sample %= max;
 	if (sample == 0) {
-		buf.push_back((float) leftTotal / 200.0);
-		buf.push_back((float) rightTotal / 200.0);
+		buf[bufIdx] = (float) sampleLeft * volL / 4.0 / 8.0;
+		buf[bufIdx + 1] = (float) sampleRight * volR / 4.0 / 8.0;
+		bufIdx += 2;
 
-		/*if (remainders-- < 0) {
-			remainders = OUTPUT_SAMPLES_REMAINDER_MAX;
-		}*/
+		// debugPrint("%f %f\n", sampleLeft, sampleRight);
 
-		leftTotal = 0;
-		rightTotal = 0;
+		sampleLeft = 0;
+		sampleRight = 0;
 
-		if (buf.size() == OUTPUT_BUFFER_SIZE * 2) {
-			SDL_QueueAudio(dev, buf.data(), (Uint32) buf.size() * sizeof(float));
-			buf.clear();
+		if (bufIdx == SOUND_BUF_SIZE * 2) {
+			SDL_QueueAudio(dev, buf.data(), (size_t) SOUND_BUF_SIZE * 2 * sizeof(float));
+			bufIdx = 0;
 		}
 	}
 }

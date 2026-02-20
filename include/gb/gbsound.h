@@ -1,14 +1,12 @@
 #pragma once
-#include "gbspace.h"
+#include <gb/gbspace.h>
+#include <gb/gbtimer.h>
 #include <SDL.h>
-#include <vector>
+#include <array>
 #include <BaseTsd.h>
 
-#define FRAME_SEQUENCE_HZ 512
-#define FRAME_SEQUENCE_PERIOD GB_HZ / FRAME_SEQUENCE_HZ
-
-#define SQUARE_FREQUENCY_PERIOD(freq) ((2048 - freq) * 4)
-#define WAVE_FREQUENCY_PERIOD(freq) ((2048 - freq) * 2)
+#define SQUARE_FREQUENCY_PERIOD(freq) ((2048 - freq))
+#define WAVE_FREQUENCY_PERIOD(freq) ((2048 - freq))
 #define NOISE_FREQUENCY_PERIOD(divisor, shift) ((divisor << shift))
 
 #define MAX_VOLUME 15.0
@@ -20,6 +18,8 @@
 #define OUTPUT_SAMPLES_REMAINDER_MAX 375
 #define OUTPUT_BUFFER_SIZE 512
 
+namespace gb::sound {
+
 class gbSC1 : public gbSpace {
 	int volume = 0;
 	int timer = 0;
@@ -28,7 +28,7 @@ class gbSC1 : public gbSpace {
 	bool sweepEnabled = false;
 	int frequencyShadow = 0;
 
-	void shiftFrequency(bool);
+	void shiftFreqCheck(bool);
 
 	void triggerSound();
 public:
@@ -39,25 +39,25 @@ public:
 		UINT8 mem[5]{ 0x80, 0x80, 0xF3, 0x00, 0x00 };
 		struct {
 			// NR10
-			UINT8 sweepShift : 3;
-			UINT8 sweepNegate : 1;
-			UINT8 sweepPeriod : 3;
+			UINT8 nr10SwpStep : 3;
+			UINT8 nr10SwpDir : 1;
+			UINT8 nr10SwpPace : 3;
 			UINT8 nr10res : 1;
 
 			// NR11
-			UINT8 length : 6;
-			UINT8 dutyCycle : 2;
+			UINT8 nr11Len : 6;
+			UINT8 nr11DutyCycle : 2;
 
 			// NR12
-			UINT8 envelopePeriod : 3;
-			UINT8 envelopeAdd : 1;
-			UINT8 startingVolume : 4;
+			UINT8 nr12EnvPeriod : 3;
+			UINT8 nr12EnvDir : 1;
+			UINT8 nr12Vol : 4;
 
 			// NR13-NR14
-			UINT16 frequency : 11;
+			UINT16 nr13Freq : 11;
 			UINT16 nr14res : 3;
-			UINT16 counter : 1;
-			UINT16 trigger : 1;
+			UINT16 nr14LenEnable : 1;
+			UINT16 nr14Trigger : 1;
 		};
 	};
 
@@ -192,16 +192,17 @@ public:
 	virtual int readByte(UINT16 addr) override;
 };
 
-class gbSound : public gbSpace {
+constexpr size_t SOUND_BUF_SIZE = 512;
+class APU : public gbSpace {
 public:
 	union {
 		UINT8 mem[3]{ 0x77, 0xF3, 0x80 };
 		struct {
 			// NR50
-			UINT8 vinL : 1;
-			UINT8 volL : 3;
-			UINT8 vinR : 1;
 			UINT8 volR : 3;
+			UINT8 vinR : 1;
+			UINT8 volL : 3;
+			UINT8 vinL : 1;
 
 			// NR51
 			UINT8 pan;
@@ -212,7 +213,7 @@ public:
 		};
 	};
 
-	gbSound();
+	APU(gb::timer::Timer &timer);
 
 	virtual int writeByte(UINT16 addr, UINT8 byte) override;
 	virtual int readByte(UINT16 addr) override;
@@ -221,13 +222,10 @@ public:
 	SDL_AudioDeviceID dev;
 
 private:
-	int frameSequencer = 0;
-	int frameCounter = 0;
-
-	double leftTotal = 0;
-	double rightTotal = 0;
+	double sampleLeft = 0;
+	double sampleRight = 0;
 	int sample = 0;
-	int remainders = 0;
+	size_t bufIdx { 0 };
 
 	bool poweredOn = true;
 
@@ -236,5 +234,14 @@ private:
 	gbSC3 sc3;
 	gbSC4 sc4;
 
-	std::vector<float> buf;
+	timer::Timer &mTimer;
+	utils::Clock mDivApuClk;
+	utils::FallingEdgeDetector mDivApuDet;
+	utils::FallingEdgeDetector mLengthDet;
+	utils::FallingEdgeDetector mSweepDet;
+	utils::FallingEdgeDetector mEnvelopeDet;
+
+	std::array<float, SOUND_BUF_SIZE * 2> buf;
 };
+
+}; // namespace gb::sound

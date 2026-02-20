@@ -56,8 +56,8 @@ public:
 		ram = new gbRam();
 		input = new gbInput();
 		serial = new gbSerial();
-		timer = new gbTimer();
-		sound = new gbSound();
+		timer = new gb::timer::Timer();
+		sound = new gb::sound::APU(*timer);
 #ifdef BOOT_ROM
 		bootRomEnable = true;
 #endif
@@ -84,8 +84,8 @@ public:
 	gbRam* ram;
 	gbInput* input;
 	gbSerial* serial;
-	gbSound* sound;
-	gbTimer* timer;
+	gb::sound::APU* sound;
+	gb::timer::Timer* timer;
 private:
 	bool bootRomEnable{ false };
 	Rom* rom;

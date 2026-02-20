@@ -27,6 +27,7 @@ class gbCpu;
 #endif
 
 #define BIT(n) (1 << (n))
+#define GENMASK(s, b) ((BIT(s + b) - 1) - (BIT(s) - 1))
 
 // interrupt enable flags
 #define VBLANK_INTR		BIT(0)

@@ -1,50 +1,30 @@
 #pragma once
-#include <BaseTsd.h>
-#include "gbspace.h"
+#include <gb/utils.hpp>
+#include <gb/gbspace.h>
+
+#include <stdint.h>
 
 namespace gb::timer {
-    class Clock {
-    public:
-        Clock(size_t clkBits);
-        
-        bool increment(uint32_t stepSize);
-
-        size_t mInitVal { 0 };
-        uint32_t mAccum { 0 };
-    private:
-        uint32_t maxVal;
-    };
-
-    class FallingEdgeDetector {
-    public:
-        bool sample(bool curVal);
-    private:
-        bool mLastVal {false};
-    };
-
-    class TriggeredClock {
-    public:
-        bool 
-    };
-
     class Timer : public gbSpace {
     public:
+        Timer();
         virtual int writeByte(UINT16 addr, UINT8 val) override;
         virtual int readByte(UINT16 addr) override;
         void step();
-        Clock &getDivClk();
+        utils::Clock &getDivClk();
     private:
         enum TIMAOverflow {
-            None,
-            Overflow,
-            Write
+            TimAInc,
+            TimAOverflow,
+            TimAWrite
         };
         
-        UINT16 div = 0;  // Always counts up
-        UINT8 tima = 0;
-        UINT8 tma = 0;  // Initial tima value
-        UINT8 tac = 0;  // Control
+        utils::Clock mDivClk;
+        utils::Clock mTimaClk;
+        utils::FallingEdgeDetector mTimaIncDet;
+        UINT8 rTac = 0;  // Control
+        UINT8 rTma;
 
-        TIMAOverflow overflow = None;
+        TIMAOverflow mTimaState = TimAInc;
     };
 };
