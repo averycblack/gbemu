@@ -5,7 +5,43 @@
 
 using namespace gb::sound;
 
-constexpr UINT8 squareWaveDuty[] {
+static const double lowPassFilterVals[]{
+	-0.000071,
+	0.000030,
+	0.000434,
+	0.001340,
+	0.002971,
+	0.005539,
+	0.009210,
+	0.014063,
+	0.020059,
+	0.027019,
+	0.034622,
+	0.042422,
+	0.049889,
+	0.056458,
+	0.061599,
+	0.064875,
+	0.066000,
+	0.064875,
+	0.061599,
+	0.056458,
+	0.049889,
+	0.042422,
+	0.034622,
+	0.027019,
+	0.020059,
+	0.014063,
+	0.009210,
+	0.005539,
+	0.002971,
+	0.001340,
+	0.000434,
+	0.000030,
+	-0.000071
+};
+
+static const UINT8 squareWaveDuty[] {
 	0b00000001,
 	0b10000001,
 	0b10000111,
@@ -14,10 +50,11 @@ constexpr UINT8 squareWaveDuty[] {
 
 void gbSC1::triggerSound() {
 	enabled = true;
+	debugPrint("Channel 1 Triggered!\n");
 	if (nr11Len == 0) 
 		nr11Len = 64;
 
-	UINT16 freq = mem[3] | ((mem[4] & 0x7) << 8);
+	UINT16 freq = nr13FreqLow | (nr14FreqHigh << 8);
 	timer = SQUARE_FREQUENCY_PERIOD(freq);
 	envelopeTimer = nr12EnvPeriod;
 	if (nr12EnvPeriod == 0)
@@ -36,21 +73,22 @@ void gbSC1::triggerSound() {
 void gbSC1::shiftFreqCheck(bool write) {
 	int shifted = frequencyShadow >> nr10SwpStep;
 	int newFreq = frequencyShadow + (nr10SwpDir ? -shifted : shifted);
+	if (nr10SwpDir && shifted > frequencyShadow)
+		newFreq = 0;
 	// Check for overflow
-	if (newFreq < 0 || newFreq > 2047) {
+	if (newFreq > 0x7FF) {
 		enabled = false;
 	} else if (write) {
 		frequencyShadow = newFreq;
-		nr13Freq = newFreq;
+		nr13FreqLow = newFreq & 0xFF;
+		nr14FreqHigh = (newFreq >> 8) & 0x7;
 	}
 }
 
 double gbSC1::step(bool lengthClock, bool volumeClock, bool sweepClock){
 	if (lengthClock && enabled && nr14LenEnable) {
 		nr11Len--;
-		if (nr11Len == 0) {
-			enabled = false;
-		}
+		enabled = nr11Len != 0;
 	}
 
 	if (volumeClock && envelopeTimer > 0) {
@@ -72,11 +110,13 @@ double gbSC1::step(bool lengthClock, bool volumeClock, bool sweepClock){
 		if (sweepTimer == 0 && sweepEnabled && nr10SwpPace != 0) {
 			sweepTimer = nr10SwpPace;
 			shiftFreqCheck(true);
+			shiftFreqCheck(false);
 		}
 	}
 
 	timer -= 1;
 	if (timer <= 0) {
+		// 1MHz timer, 11 bit register
 		timer = SQUARE_FREQUENCY_PERIOD(frequencyShadow);
 		cycle++;
 		cycle %= 8;
@@ -125,39 +165,39 @@ int gbSC1::readByte(UINT16 addr) {
 
 void gbSC2::triggerSound() {
 	enabled = true;
+	debugPrint("Channel 2 Triggered!\n");
 
-	if (length == 0)
-		length = 64;
+	if (nr21Len == 0)
+		nr21Len = 64;
 
-	UINT16 freq = mem[3] | ((mem[4] & 0x7) << 8);
+	UINT16 freq = nr23FreqLow | (nr24FreqHigh << 8);
 	timer = SQUARE_FREQUENCY_PERIOD(freq);
-	envelopeTimer = envelopePeriod;
-	volume = startingVolume;
+	envelopeTimer = nr22EnvPeriod;
+	volume = nr22Vol;
 }
 
 double gbSC2::step(bool lengthClock, bool volumeClock, bool sweepClock) {
-	if (lengthClock && enabled && counter) {
-		length--;
-		if (length == 0) {
-			enabled = false;
-		}
+	if (lengthClock && enabled && nr24LenEnable) {
+		nr21Len--;
+		enabled = nr21Len != 0;
 	}
 
 	if (volumeClock && envelopeTimer > 0) {
 		envelopeTimer--;
 		// Volume Envelope stops when at min or max
-		if (envelopeTimer == 0 && envelopePeriod != 0) {
-			int tempVol = volume + (envelopeAdd ? 1 : -1);
+		if (envelopeTimer == 0 && nr22EnvPeriod != 0) {
+			int tempVol = volume + (nr22EnvDir ? 1 : -1);
 			if (tempVol >= 0 && tempVol <= 15) {
 				volume = tempVol;
-				envelopeTimer = envelopePeriod;
+				envelopeTimer = nr22EnvPeriod;
 			}
 		}
 	}
 
 	timer -= 1;
 	if (timer <= 0) {
-		UINT16 freq = mem[3] | ((mem[4] & 0x7) << 8);
+		// 1MHz timer, 11 bit register
+		UINT16 freq = nr23FreqLow | (nr24FreqHigh << 8);
 		timer = SQUARE_FREQUENCY_PERIOD(freq);
 		cycle++;
 		cycle %= 8;
@@ -168,7 +208,7 @@ double gbSC2::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 		return 0.0;
 	}
 
-	UINT8 duty = squareWaveDuty[dutyCycle];
+	UINT8 duty = squareWaveDuty[nr21DutyCycle];
 	double effectiveVolume = volume/*/ MAX_VOLUME*/;
 	return ((duty >> cycle) & 0x1) * effectiveVolume / 15.0;
 }
@@ -182,7 +222,7 @@ int gbSC2::writeByte(UINT16 addr, UINT8 byte) {
 	}
 
 	if (addr == 0xFF16) {
-		length = 64 - length;
+		nr21Len = 64 - nr21Len;
 	}
 
 	return 0;
@@ -204,6 +244,7 @@ int gbSC2::readByte(UINT16 addr) {
 
 void gbSC3::triggerSound() {
 	enabled = true;
+	debugPrint("Channel 3 Triggered!\n");
 
 	// During the clock, length is decremented first before checking for 0.
 	// This will underflow to 255, acting like it was 256 initially.
@@ -227,6 +268,7 @@ double gbSC3::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 	timer -= 2;
 	if (timer <= 0) {
 		UINT16 freq = mem[3] | ((mem[4] & 0x7) << 8);
+		// Clocked at 2MHz
 		timer += WAVE_FREQUENCY_PERIOD(freq);
 		sample++;
 		sample %= 32;
@@ -291,12 +333,16 @@ int gbSC3::readByte(UINT16 addr) {
 
 void gbSC4::triggerSound() {
 	enabled = true;
-	shiftRegister = 0xFFFF;
+	debugPrint("Channel 4 Triggered!\n");
+	shiftRegister = 0x0;
 
 	if (length == 0)
 		length = 64;
 
-	timer = NOISE_FREQUENCY_PERIOD((divisor + 1) * 2, clockShift);
+	// Clocked at 262144 / (divider * 2^shift)
+	// = 1MHz / (4 * divider * 2^shift)
+	// = 1MHz / (divider * 2^(shift + 2))
+	timer = divisor << clockShift + 2;
 	envelopeTimer = envelopePeriod;
 	volume = startingVolume;
 }
@@ -321,17 +367,23 @@ double gbSC4::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 		}
 	}
 
-	timer -= 4;
+	timer -= 1;
 	if (timer <= 0) {
-		timer = NOISE_FREQUENCY_PERIOD((divisor + 1) * 2, clockShift);
-		UINT16 xorRes = shiftRegister & 1;
-		shiftRegister >>= 1;
-		xorRes ^= shiftRegister & 1;
-
-		shiftRegister |= xorRes << 14;
+		// Clocked at 262144 / (divider * 2^shift)
+		// = 1MHz / (4 * divider * 2^shift)
+		// = 1MHz / (divider * 2^(shift + 2))
+		timer = divisor << clockShift + 2;
+		UINT16 xorRes = (shiftRegister & 1) ^ ((shiftRegister >> 1) & 1);
+		xorRes ^= 1; // invert
+		
+		shiftRegister &= ~BIT(15);
+		shiftRegister |= xorRes << 15;
 		if (width) {
-			shiftRegister |= /*(shiftRegister & 0xFFBF) | */(xorRes << 6);
+			shiftRegister &= ~BIT(7);
+			shiftRegister |= xorRes << 7;
 		}
+
+		shiftRegister >>= 1;
 	}
 
 	if (!enabled) {
@@ -339,7 +391,7 @@ double gbSC4::step(bool lengthClock, bool volumeClock, bool sweepClock) {
 	}
 
 	double effectiveVolume = volume/*/ MAX_VOLUME*/;
-	return (!(shiftRegister & 0x1)) * (effectiveVolume / 15.0);
+	return (shiftRegister & 0x1) * (effectiveVolume / 15.0);
 }
 
 int gbSC4::writeByte(UINT16 addr, UINT8 byte) {
@@ -377,9 +429,9 @@ APU::APU(gb::timer::Timer &timer) : mTimer(timer), mDivApuClk(8) {
 	SDL_AudioSpec gotSpec{ 0 };
 
 	outSpec.freq = OUTPUT_FREQ;
-	outSpec.format = AUDIO_F32;
+	outSpec.format = AUDIO_F32SYS;
 	outSpec.channels = 2;
-	outSpec.samples = OUTPUT_BUFFER_SIZE;
+	outSpec.samples = SOUND_BUF_SIZE;
 	outSpec.callback = nullptr;
 
 	dev = SDL_OpenAudioDevice(NULL, 0, &outSpec, &gotSpec, 0);
@@ -393,7 +445,7 @@ APU::APU(gb::timer::Timer &timer) : mTimer(timer), mDivApuClk(8) {
 
 int APU::writeByte(UINT16 addr, UINT8 byte) {
 	UINT8 on;
-	debugPrint("%x %x\n", addr, byte);
+	// debugPrint("%x %x\n", addr, byte);
 	if (sc1.writeByte(addr, byte) == 0) return 0;
 	if (sc2.writeByte(addr, byte) == 0) return 0;
 	if (sc3.writeByte(addr, byte) == 0) return 0;
@@ -461,7 +513,7 @@ void APU::step() {
 	uint32_t divApu = mDivApuClk.mAccum;
 	bool lengthClock = mLengthDet.sample(divApu & BIT(0));
 	bool sweepClock = mSweepDet.sample(divApu & BIT(1));
-	bool envelopeClock = mSweepDet.sample(divApu & BIT(2));
+	bool envelopeClock = mEnvelopeDet.sample(divApu & BIT(2));
 
 	if (!poweredOn) return;
 
@@ -470,35 +522,35 @@ void APU::step() {
 	double ret3 = sc3.step(lengthClock, envelopeClock, sweepClock);
 	double ret4 = sc4.step(lengthClock, envelopeClock, sweepClock);
 	
-	if (pan & 0x01) sampleLeft += ret1;
-	if (pan & 0x02) sampleLeft += ret2;
-	if (pan & 0x04) sampleLeft += ret3;
-	if (pan & 0x08) sampleLeft += ret4;
+	double left = 0, right = 0;
 
-	if (pan & 0x10) sampleRight += ret1;
-	if (pan & 0x20) sampleRight += ret2;
-	if (pan & 0x40) sampleRight += ret3;
-	if (pan & 0x80) sampleRight += ret4;
+	if (pan & 0x01) left += ret1;
+	if (pan & 0x02) left += ret2;
+	if (pan & 0x04) left += ret3;
+	if (pan & 0x08) left += ret4;
 
-	// leftTotal += double(left * volL * lowPassFilterVals[sample % std::size(lowPassFilterVals) ]);
-	// rightTotal += double(right * volR * lowPassFilterVals[sample % std::size(lowPassFilterVals)]);
+	if (pan & 0x10) right += ret1;
+	if (pan & 0x20) right += ret2;
+	if (pan & 0x40) right += ret3;
+	if (pan & 0x80) right += ret4;
+
+	sampleLeft += double(left * volL * lowPassFilterVals[sample]);
+	sampleRight += double(right * volR * lowPassFilterVals[sample]);
 
 	sample++;
-	int max = OUTPUT_SAMPLES;
-
-	sample %= max;
+	sample %= OUTPUT_SAMPLES;
 	if (sample == 0) {
-		buf[bufIdx] = (float) sampleLeft * volL / 4.0 / 8.0;
-		buf[bufIdx + 1] = (float) sampleRight * volR / 4.0 / 8.0;
+		constexpr double NumChannels = 4.0;
+		constexpr double MaxVol = 8.0;
+		buf[bufIdx] = (float) sampleLeft * volL / (MaxVol * NumChannels * 8);
+		buf[bufIdx + 1] = (float) sampleRight * volR / (MaxVol * NumChannels * 8);
 		bufIdx += 2;
-
-		// debugPrint("%f %f\n", sampleLeft, sampleRight);
 
 		sampleLeft = 0;
 		sampleRight = 0;
 
 		if (bufIdx == SOUND_BUF_SIZE * 2) {
-			SDL_QueueAudio(dev, buf.data(), (size_t) SOUND_BUF_SIZE * 2 * sizeof(float));
+			SDL_QueueAudio(dev, buf.data(), (uint32_t) SOUND_BUF_SIZE * 2 * sizeof(float));
 			bufIdx = 0;
 		}
 	}

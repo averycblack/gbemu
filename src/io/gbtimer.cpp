@@ -55,7 +55,7 @@ void Timer::step() {
     bool timaInc;
     uint32_t divMask = TIMADetectBit[rTac & REG_TAC_FREQ];
 
-    // Increments on M-Cycles
+    // Increments at 1MHz (M-Cycles)
     mDivClk.increment(1);
     timaInc = mTimaIncDet.sample(mDivClk.mAccum & divMask);
 

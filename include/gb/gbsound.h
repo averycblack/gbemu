@@ -14,9 +14,6 @@
 #define OUTPUT_FREQ 32768
 //#define OUTPUT_FREQ 48000
 #define OUTPUT_SAMPLES GB_HZ / 4 / OUTPUT_FREQ
-#define OUTPUT_SAMPLES_REMAINDER 316
-#define OUTPUT_SAMPLES_REMAINDER_MAX 375
-#define OUTPUT_BUFFER_SIZE 512
 
 namespace gb::sound {
 
@@ -26,7 +23,7 @@ class gbSC1 : public gbSpace {
 	int envelopeTimer = 0;
 	int sweepTimer = 0;
 	bool sweepEnabled = false;
-	int frequencyShadow = 0;
+	uint32_t frequencyShadow = 0;
 
 	void shiftFreqCheck(bool);
 
@@ -53,11 +50,14 @@ public:
 			UINT8 nr12EnvDir : 1;
 			UINT8 nr12Vol : 4;
 
-			// NR13-NR14
-			UINT16 nr13Freq : 11;
-			UINT16 nr14res : 3;
-			UINT16 nr14LenEnable : 1;
-			UINT16 nr14Trigger : 1;
+			// NR13
+			UINT8 nr13FreqLow;
+
+			// NR14 
+			UINT8 nr14FreqHigh : 3;
+			UINT8 nr14res : 3;
+			UINT8 nr14LenEnable : 1;
+			UINT8 nr14Trigger : 1;
 		};
 	};
 
@@ -82,19 +82,22 @@ public:
 			UINT8 nr20res;
 
 			// NR21
-			UINT8 length : 6;
-			UINT8 dutyCycle : 2;
+			UINT8 nr21Len : 6;
+			UINT8 nr21DutyCycle : 2;
 
 			// NR22
-			UINT8 envelopePeriod : 3;
-			UINT8 envelopeAdd : 1;
-			UINT8 startingVolume : 4;
+			UINT8 nr22EnvPeriod : 3;
+			UINT8 nr22EnvDir : 1;
+			UINT8 nr22Vol : 4;
 
-			// NR23-NR24
-			UINT16 frequency : 11;
-			UINT16 nr14res : 3;
-			UINT16 counter : 1;
-			UINT16 trigger : 1;
+			// NR23
+			UINT8 nr23FreqLow;
+
+			// NR24
+			UINT8 nr24FreqHigh : 3;
+			UINT8 nr24res : 3;
+			UINT8 nr24LenEnable : 1;
+			UINT8 nr24Trigger : 1;
 		};
 	};
 
